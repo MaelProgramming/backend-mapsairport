@@ -11,6 +11,10 @@ app.use(express.json())
 
 app.use("/airports", airports)
 app.use("/terminal", terminal)
+app.get("/health", (req, res) => {
+  res.json({ ok: true })
+})
+
 
 
 
