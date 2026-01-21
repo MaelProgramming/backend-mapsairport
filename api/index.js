@@ -2,7 +2,7 @@ import express from "express"
 import cors from "cors"
 
 import airports from "./airports.js"
-import terminal from "./terminals.js"
+import terminal from "./terminal.js"
 
 const app = express()
 
