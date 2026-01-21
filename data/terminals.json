@@ -1,0 +1,19 @@
+[
+  {
+    "id": "1", 
+    "airportName": "Madrid-Barajas", 
+    "numeroTerminal": "1" 
+  },
+  {
+    "id": "2", 
+    "airportName": "Madrid-Barajas", 
+    "numeroTerminal": "2"
+  },
+  {
+    "id": "3", 
+    "airportName": "Madrid-Barajas", 
+    "numeroTerminal": "3" 
+  }
+  
+  
+]
