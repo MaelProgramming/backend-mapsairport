@@ -5,7 +5,7 @@ import path from "path"
 const router = express.Router()
 
 const __dirname = new URL(".", import.meta.url).pathname
-const dataPath = path.join(__dirname, "../data/terminal.json")
+const dataPath = path.join(__dirname, "../data/terminals.json")
 const terminal = JSON.parse(fs.readFileSync(dataPath, "utf-8"))
 
 router.get("/", (req, res) => {
