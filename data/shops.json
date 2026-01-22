@@ -2,8 +2,12 @@
     {
         "id": "shop1",
         "name": "McDonalds",
-        "longitude":"-3.5932705",
-        "lattitude":"40.4909392",
         "level": "1"
+
+    },
+    {
+        "id":"shop2",
+        "name":"Starbucks",
+        "level": "2"
     }
 ]
