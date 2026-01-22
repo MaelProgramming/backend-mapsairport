@@ -13,11 +13,11 @@ router.get("/", (req, res) => {
 })
 
 router.get("/:id", (req, res) => {
-  const shop = shop.find(s => s.id === req.params.id)
-  if (!terminal) {
+  const shops = shop.find(s => s.id === req.params.id)
+  if (!shops) {
     return res.status(404).json({ error: "Shop not found not found" })
   }
-  res.json(shop)
+  res.json(shops)
 })
 
 export default router
