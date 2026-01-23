@@ -2,6 +2,7 @@
   "name": "maps-airport-backend",
   "version": "1.0.0",
   "type": "module",
+  "main":"api/airports.js",
   "scripts": {
     "dev": "vercel dev"
   },
