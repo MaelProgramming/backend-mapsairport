@@ -21,38 +21,34 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /airports/:id → un aéroport spécifique
 router.get("/:id", async (req, res) => {
   try {
-    // 1. Nettoyage de l'ID : conversion en string, retrait des espaces et du slash final éventuel
-    const rawId = req.params.id;
     const cleanId = String(req.params.id).trim();
 
-
     console.log(`Tentative de lecture du document ID: "${cleanId}"`);
-    const doc = await db.collection("airports").doc(cleanId).get()
 
-    // 3. Vérification de l'existence
+    const doc = await db
+      .collection("airports")
+      .doc(cleanId)
+      .get();
+
     if (!doc.exists) {
-      console.warn(`Document "${cleanId}" introuvable dans la collection "airports"`);
-      return res.status(404).json({ 
-        error: "Airport not found", 
-        requestedId: cleanId 
+      return res.status(404).json({
+        error: "Airport not found",
+        requestedId: cleanId
       });
     }
 
-    // 4. Succès
     res.json({ id: doc.id, ...doc.data() });
 
   } catch (err) {
-    // Ce log apparaîtra dans l'onglet "Logs" de Vercel
     console.error("Erreur Firestore (Single Doc):", err);
-    
-    res.status(500).json({ 
-      error: "Impossible de récupérer l'aéroport", 
-      message: err.message 
+    res.status(500).json({
+      error: "Impossible de récupérer l'aéroport",
+      message: err.message
     });
   }
 });
+
 
 export default router;
