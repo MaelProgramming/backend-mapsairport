@@ -6,7 +6,7 @@ if (!admin.apps.length) {
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       // Décodage de la clé Base64 en string PEM
-      privateKey: Buffer.from(process.env.FIREBASE_PRIVATE_KEY, "base64").toString("utf8"),
+      privateKey: Buffer.from(process.env.FIREBASE_KEY_BASE64, "base64").toString("utf8"),
     }),
   });
 }
