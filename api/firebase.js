@@ -1,13 +1,23 @@
 import admin from "firebase-admin";
 
-const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_SECRET);
+let db;
 
-// 🔑 Remplacer les \n par de vrais sauts de ligne
-serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+if (!admin.apps.length) {
+  try {
+    const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_SECRET);
+    
+    // Correction cruciale pour la clé privée
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Admin initialisé avec succès");
+  } catch (error) {
+    console.error("Erreur lors de l'initialisation de Firebase Admin :", error);
+  }
+}
 
-const db = admin.firestore();
+db = admin.firestore();
+
 export { db };
