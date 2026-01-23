@@ -4,18 +4,26 @@ let db;
 
 if (!admin.apps.length) {
   try {
-    const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_SECRET);
-    
-    // Correction cruciale pour la clé privée
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+  const secretStr = process.env.SERVICE_ACCOUNT_SECRET;
+  if (!secretStr) throw new Error("SERVICE_ACCOUNT_SECRET is undefined");
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin initialisé avec succès");
-  } catch (error) {
-    console.error("Erreur lors de l'initialisation de Firebase Admin :", error);
-  }
+  const serviceAccount = JSON.parse(secretStr);
+
+  // Nettoyage ultra-précis de la clé
+  const formattedKey = serviceAccount.private_key
+    .replace(/\\n/g, '\n') // Remplace les doubles backslashs
+    .replace(/"/g, '');    // Supprime d'éventuels guillemets résiduels
+
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      ...serviceAccount,
+      private_key: formattedKey
+    })
+  });
+  console.log("Firebase Admin connecté.");
+} catch (error) {
+  console.error("Erreur d'initialisation:", error.message);
+}
 }
 
 db = admin.firestore();
