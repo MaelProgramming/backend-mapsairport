@@ -1,41 +1,26 @@
 import admin from "firebase-admin";
 
-let db;
-
 if (!admin.apps.length) {
   try {
-    const projectId = process.env.PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    // On récupère la clé et on traite les sauts de ligne
-    const privateKey = process.env.FIREBASE_KEY?.replace(/\\n/g, "\n");
-
-    if (!projectId || !clientEmail || !privateKey) {
-      throw new Error(
-        "Certaines variables d'environnement Firebase sont manquantes.",
-      );
-    }
+    // 1. On nettoie la clé de TOUT caractère parasite (guillemets, espaces, doubles backslashes)
+    const rawKey = process.env.FIREBASE_KEY || "";
+    const formattedKey = rawKey
+      .replace(/\\n/g, '\n') // Change les \n texte en vrais sauts de ligne
+      .trim()                // Enlève les espaces au début/fin
+      .replace(/^"+|"+$/g, ''); // Enlève les guillemets s'ils ont été collés par erreur
 
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: projectId,
-        clientEmail: clientEmail,
-        privateKey: privateKey,
+        projectId: process.env.PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: formattedKey,
       }),
     });
-
-    console.log("Firebase Admin initialisé via variables séparées.");
+    
+    console.log("Tentative de connexion avec l'email:", process.env.FIREBASE_CLIENT_EMAIL);
   } catch (error) {
-    // Remplacez votre throw actuel par celui-ci pour tester
-    if (!projectId || !clientEmail || !privateKey) {
-      const missing = [];
-      if (!projectId) missing.push("PROJECT_ID");
-      if (!clientEmail) missing.push("FIREBASE_CLIENT_EMAIL");
-      if (!privateKey) missing.push("FIREBASE_KEY");
-      throw new Error(`Variables manquantes : ${missing.join(", ")}`);
-    }
+    console.error("Erreur setup admin:", error.message);
   }
 }
 
-db = admin.firestore();
-
-export { db };
+export const db = admin.firestore();
