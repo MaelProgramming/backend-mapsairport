@@ -4,38 +4,29 @@ let db;
 
 if (!admin.apps.length) {
   try {
-    const secretStr = process.env.SERVICE_ACCOUNT_SECRET;
-    if (!secretStr) throw new Error("SERVICE_ACCOUNT_SECRET is undefined");
+    const projectId = process.env.PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    // On récupère la clé et on traite les sauts de ligne
+    const privateKey = process.env.FIREBASE_KEY?.replace(/\\n/g, '\n');
 
-    // On parse le JSON
-    const serviceAccount = JSON.parse(secretStr);
-
-    // NETTOYAGE EXTRÊME :
-    // 1. On traite les doubles backslashes
-    // 2. On retire les guillemets qui entourent parfois la clé
-    // 3. On s'assure que la clé commence bien par le header standard
-    let privateKey = serviceAccount.private_key;
-    
-    if (privateKey) {
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-        privateKey = privateKey.substring(1, privateKey.length - 1);
-      }
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error("Certaines variables d'environnement Firebase sont manquantes.");
     }
 
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
+        projectId: projectId,
+        clientEmail: clientEmail,
         privateKey: privateKey,
       }),
     });
 
-    console.log("Firebase Admin initialisé avec succès.");
+    console.log("Firebase Admin initialisé via variables séparées.");
   } catch (error) {
-    console.error("ERREUR CRITIQUE INITIALISATION:", error.message);
+    console.error("Erreur d'initialisation Firebase:", error.message);
   }
 }
 
 db = admin.firestore();
+
 export { db };
