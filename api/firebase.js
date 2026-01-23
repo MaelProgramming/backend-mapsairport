@@ -8,7 +8,7 @@ if (!admin.apps.length) {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
     const privateKey = Buffer
-      .from(process.env.FIREBASE_PRIVATE_KEY_BASE64, "base64")
+      .from(process.env.FIREBASE_KEY_BASE64, "base64")
       .toString("utf8");
 
     admin.initializeApp({
