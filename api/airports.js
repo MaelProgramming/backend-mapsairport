@@ -26,13 +26,11 @@ router.get("/:id", async (req, res) => {
   try {
     // 1. Nettoyage de l'ID : conversion en string, retrait des espaces et du slash final éventuel
     const rawId = req.params.id;
-    const cleanId = String(rawId).trim().replace(/\/$/, "");
+    const cleanId = String(req.params.id).trim();
+
 
     console.log(`Tentative de lecture du document ID: "${cleanId}"`);
-
-    // 2. Appel à Firestore
-    const docRef = db.collection("airports").doc(cleanId);
-    const doc = await docRef.get();
+    const doc = await db.collection("airports").doc(cleanId).get()
 
     // 3. Vérification de l'existence
     if (!doc.exists) {
