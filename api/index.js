@@ -1,4 +1,4 @@
-import airports from "./airportsName";
+import airports from "./airportsName.js";
 
 export default function handler(req, res){
     // CORS
