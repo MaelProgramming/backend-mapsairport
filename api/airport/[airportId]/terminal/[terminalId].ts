@@ -1,38 +1,62 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-
-interface AirportData {
-  polygons: Array<{ id: string; type: string; points: string; label: string }>;
-  markers: Array<{ id: string; type: string; name: string; position: { x: number; y: number } }>
-  viewBox: string;
+// On vérifie si Firebase est déjà initialisé pour éviter de crash au warm-up
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // On gère le cas des sauts de ligne dans la clé privée
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
 }
+
+const db = getFirestore();
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Récupération des IDs depuis l'URL
   const { airportId, terminalId } = req.query;
-  
-  // Sécurité minimale : on vérifie que c'est bien des strings
+
   if (typeof airportId !== 'string' || typeof terminalId !== 'string') {
     return res.status(400).json({ error: "IDs invalides" });
   }
-  // Adding header to manage cache
-  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
-  // Ici, tu pourrais charger tes data statiques du T4
-  // sans payer un seul centime à Firebase
-  const mapData: AirportData = {
-    polygons: [
-      { id: "hall-a", type: "hall", points: "0,0 100,0 100,50 0,50", label: "Zone Transit" },
-      { id: "duty-free-1", type: "shop", points: "20,20 40,20 40,30 20,30", label: "Dufry" }
-    ],
-    markers: [
-      { id: "gate-j52", type: "gate", name: "Porte J52", position: { x: 450, y: 120 } },
-      { id: "security-t4", type: "security", name: "Security Checkpoint", position: { x: 300, y: 250 } }
-    ],
-    viewBox: "0 0 2000 1500"
+
+  try {
+    // 1. Fetch direct dans Firestore
+    const doc = await db.collection("airports").doc(airportId).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Aéroport non trouvé" });
+    }
+
+    const airport: any = doc.data();
+    const floorIndex = parseInt(terminalId);
+    const floor = airport.floors && airport.floors[floorIndex];
+
+    if (!floor) {
+      return res.status(404).json({ error: `Étage/Terminal ${terminalId} introuvable` });
+    }
+
+    // 2. Cache Vercel
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
+
+    // 3. Réponse propre
+    return res.status(200).json({
+      airport: airport.name,
+      location: airport.position,
+      data: {
+        floorName: floor.name,
+        level: floor.level,
+        areas: floor.areas,
+        markers: floor.markers,
+        viewBox: "0 0 1000 800"
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Erreur Melio Backend:", error);
+    return res.status(500).json({ error: "Erreur Firebase", details: error.message });
   }
-  return res.status(200).json({
-    airport: airportId,
-    terminal: terminalId,
-    status: "ready",
-    data: mapData
-  });
 }
