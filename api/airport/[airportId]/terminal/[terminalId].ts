@@ -2,6 +2,42 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
+
+// Interfaces
+interface GeoPosition {
+  lat: number;
+  lng: number;
+}
+
+interface Area {
+  id: string;
+  name: string;
+  type: 'shop' | 'gate' | 'lounge' | 'security';
+  path: string; // SVG path ou coordonnées
+}
+
+interface Marker {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+}
+
+interface Floor {
+  name: string;
+  level: number;
+  areas: Area[];
+  markers: Marker[];
+}
+
+interface Airport {
+  name: string;
+  position: GeoPosition;
+  floors: Floor[];
+}
+
+
+
 // On vérifie si Firebase est déjà initialisé pour éviter de crash au warm-up
 if (!getApps().length) {
   initializeApp({
@@ -14,6 +50,7 @@ if (!getApps().length) {
   });
 }
 
+// Permet de créer directement
 const db = getFirestore();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -31,14 +68,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: "Aéroport non trouvé" });
     }
 
-    const airport: any = doc.data();
+    const airport = doc.data() as Airport;
     const floorIndex = parseInt(terminalId);
     const floor = airport.floors && airport.floors[floorIndex];
 
     if (!floor) {
       return res.status(404).json({ error: `Étage/Terminal ${terminalId} introuvable` });
     }
-
+    const authHeader = req.headers.authorization;
+    if(!authHeader || !authHeader.startsWith('Bearer')){
+      return res.status(401).json({ error: 'Authentification requise'})
+    }
     // 2. Cache Vercel
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
 
@@ -55,8 +95,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Erreur Melio Backend:", error);
-    return res.status(500).json({ error: "Erreur Firebase", details: error.message });
+    const errorMessage = error instanceof Error ? error.message: String(error)
+    return res.status(500).json({ error: "Erreur Firebase", details: errorMessage });
   }
 }
