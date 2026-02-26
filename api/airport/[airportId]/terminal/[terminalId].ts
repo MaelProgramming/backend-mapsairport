@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-
+import { getAuth } from 'firebase-admin/auth';
 
 // Interfaces
 interface GeoPosition {
@@ -13,7 +13,7 @@ interface Area {
   id: string;
   name: string;
   type: 'shop' | 'gate' | 'lounge' | 'security';
-  path: string; // SVG path ou coordonnées
+  coords: [number, number][]; // Corrigé : un tableau de couples [lng, lat]
 }
 
 interface Marker {
@@ -36,32 +36,40 @@ interface Airport {
   floors: Floor[];
 }
 
-
-
-// On vérifie si Firebase est déjà initialisé pour éviter de crash au warm-up
+// Initialisation Firebase
 if (!getApps().length) {
   initializeApp({
     credential: cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // On gère le cas des sauts de ligne dans la clé privée
       privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }
 
-// Permet de créer directement
 const db = getFirestore();
+const auth = getAuth();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { airportId, terminalId } = req.query;
-
-  if (typeof airportId !== 'string' || typeof terminalId !== 'string') {
-    return res.status(400).json({ error: "IDs invalides" });
+  // 1. Vérification Auth DIRECTE (avant de toucher à la DB pour économiser tes quotas)
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentification requise' });
   }
 
+  const token = authHeader.split(' ')[1];
+
   try {
-    // 1. Fetch direct dans Firestore
+    // Optionnel : décommenter pour vraiment valider le token sur ton Realme 12 5G
+    // await auth.verifyIdToken(token);
+
+    const { airportId, terminalId } = req.query;
+
+    if (typeof airportId !== 'string' || typeof terminalId !== 'string') {
+      return res.status(400).json({ error: "IDs invalides" });
+    }
+
+    // 2. Fetch Firestore
     const doc = await db.collection("airports").doc(airportId).get();
     
     if (!doc.exists) {
@@ -75,14 +83,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!floor) {
       return res.status(404).json({ error: `Étage/Terminal ${terminalId} introuvable` });
     }
-    const authHeader = req.headers.authorization;
-    if(!authHeader || !authHeader.startsWith('Bearer')){
-      return res.status(401).json({ error: 'Authentification requise'})
+
+    // 3. Calcul dynamique du ViewBox (pour éviter que le T4 soit déformé)
+    const allCoords = floor.areas.flatMap(a => a.coords);
+    let viewBox = "0 0 1000 800"; // Fallback
+
+    if (allCoords.length > 0) {
+      const lngs = allCoords.map(c => c[0]);
+      const lats = allCoords.map(c => c[1]);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      
+      const w = maxLng - minLng;
+      const h = maxLat - minLat;
+      const pad = 0.1; // 10% de marge
+      viewBox = `${minLng - w*pad} ${minLat - h*pad} ${w * (1 + 2*pad)} ${h * (1 + 2*pad)}`;
     }
-    // 2. Cache Vercel
+
+    // 4. Cache Vercel & Réponse (Max 1GB/jour de download gratuit)
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
 
-    // 3. Réponse propre
     return res.status(200).json({
       airport: airport.name,
       location: airport.position,
@@ -91,13 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         level: floor.level,
         areas: floor.areas,
         markers: floor.markers,
-        viewBox: "0 0 1000 800"
+        viewBox
       }
     });
 
   } catch (error: unknown) {
     console.error("Erreur Melio Backend:", error);
-    const errorMessage = error instanceof Error ? error.message: String(error)
-    return res.status(500).json({ error: "Erreur Firebase", details: errorMessage });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: "Erreur Serveur", details: errorMessage });
   }
 }
