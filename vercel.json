@@ -2,8 +2,12 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/airport/:airportId",
+      "destination": "/api/airport/[airportId]"
+    },
+    {
       "source": "/api/airport/:airportId/terminal/:terminalId",
-      "destination": "/api/airport/[airportId]/terminal/[terminalId].ts"
+      "destination": "/api/airport/[airportId]/terminal/[terminalId]"
     }
   ]
 }
