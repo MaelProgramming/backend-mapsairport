@@ -17,23 +17,22 @@ const db = getFirestore();
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
+  // Sécurité Melio [cite: 2026-02-01, 2026-02-23]
   const auth = req.headers.authorization;
   if (auth !== `Bearer ${process.env.ADMIN_SECRET_KEY}`) return res.status(401).json({ error: "Unauthorized" });
 
-  const { airportId, terminalId, name, level, areas } = req.body;
+  const { id, name, city, iata, location } = req.body;
 
   try {
-    // On range ça dans une sous-collection "terminals" [cite: 2026-02-01]
-    await db.collection("airports").doc(airportId)
-      .collection("terminals").doc(terminalId)
-      .set({
-        name,
-        level,
-        areas, // Tes polygones T4 [cite: 2026-02-01]
-        lastSync: new Date().toISOString()
-      }, { merge: true });
+    await db.collection("airports").doc(id).set({
+      name,
+      city,
+      iata,
+      center: location, // [lat, lng]
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
 
-    return res.status(200).json({ message: `Plan du ${name} synchronisé !` });
+    return res.status(200).json({ message: `Aéroport ${name} mis à jour !` });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
