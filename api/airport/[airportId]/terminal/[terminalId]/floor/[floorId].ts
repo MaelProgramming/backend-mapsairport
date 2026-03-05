@@ -14,7 +14,18 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
+// Un petit interface pour pas bosser en aveugle
+interface Area {
+  id: string;
+  label?: string;
+  name?: string;
+  type?: string;
+  path: { lat: number; lng: number }[];
+  [key: string]: any; 
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Config CORS propre
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -23,47 +34,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { airportId, terminalId, floorId } = req.query;
 
+  // Check rapide des params
+  if (!airportId || !terminalId || !floorId) {
+    return res.status(400).json({ error: "Missing parameters" });
+  }
+
   try {
-    const floorDoc = await db
+    const floorRef = db
       .collection("airports").doc(airportId as string)
       .collection("terminals").doc(terminalId as string)
-      .collection("floors").doc(floorId as string)
-      .get();
+      .collection("floors").doc(floorId as string);
 
-    if (!floorDoc.exists) return res.status(404).json({ error: "Document introuvable" });
+    const floorDoc = await floorRef.get();
+
+    if (!floorDoc.exists) {
+      return res.status(404).json({ error: "Floor non trouvé dans Firestore" });
+    }
 
     const data = floorDoc.data();
-    
-    // On récupère 'areas' (ton objet avec l'ID et le Type)
-    const areaBase = data?.areas || {};
-    
-    // On récupère 'path' qui est AU PREMIER NIVEAU du document (data.path)
-    const rawPath = data?.path || [];
-    
-    // Conversion Map ou Array en Array propre
-    const points = Array.isArray(rawPath) ? rawPath : Object.values(rawPath);
+    const rawAreas = (data?.areas as Area[]) || [];
 
-    const cleanPath = points.map((p: any) => ({
-      lat: Number(p.lat),
-      lng: Number(p.lng)
-    })).filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+    const cleanAreas = rawAreas.map((area, index) => {
+      // On normalise le path : gère les tableaux, les objets et les coordonnées stringifiées
+      const rawPath = area.path || [];
+      const points = Array.isArray(rawPath) ? rawPath : Object.values(rawPath);
 
-    // On fusionne les deux pour Melio
-    const finalArea = {
-      id: areaBase.id || "t4-main-outline",
-      name: areaBase.label || data?.label || "Niveau 0 - Arrivées",
-      type: areaBase.type || "terminal",
-      path: cleanPath 
-    };
+      const cleanPath = points
+        .map((p: any) => ({
+          lat: typeof p.lat === 'number' ? p.lat : parseFloat(p.lat),
+          lng: typeof p.lng === 'number' ? p.lng : parseFloat(p.lng)
+        }))
+        .filter(p => !isNaN(p.lat) && !isNaN(p.lng));
 
+      return {
+        ...area, // On garde tout (important pour ton debug !)
+        id: area.id || `area-${index}`,
+        // Melio veut probablement 'name', mais ton screen montre 'label'. On met les deux.
+        name: area.label || area.name || `Zone ${index}`,
+        label: area.label || area.name || `Zone ${index}`,
+        path: cleanPath
+      };
+    });
+
+    // On renvoie tout proprement
     return res.status(200).json({
       id: floorDoc.id,
-      label: data?.label || finalArea.name,
+      label: data?.label || `Niveau ${data?.level ?? 0}`,
       level: data?.level ?? 0,
-      areas: [finalArea]
+      areas: cleanAreas 
     });
 
   } catch (error: any) {
-    return res.status(500).json({ error: "Erreur serveur", details: error.message });
+    console.error("Erreur API Melio:", error);
+    return res.status(500).json({ 
+      error: "Erreur serveur", 
+      details: error.message 
+    });
   }
 }
